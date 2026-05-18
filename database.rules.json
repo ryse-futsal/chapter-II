@@ -1,0 +1,21 @@
+{
+  "rules": {
+
+    "teams": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+    "matches": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+    "players": {
+      ".read": true,
+      ".write": "auth != null"
+    },
+    "goals": {
+      ".read": true,
+      ".write": "auth != null"
+    }
+  }
+}
