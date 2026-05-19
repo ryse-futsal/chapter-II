@@ -287,10 +287,7 @@ button:focus-visible,[role="button"]:focus-visible{outline:2px solid var(--gold)
   .atabs{gap:6px;}.atb{padding:8px 12px;font-size:11px;}
   .h-scue{display:none;}
   .lb2{padding:36px 24px;}
-  /* Hide GF, GA, GD on mobile standings — keep #, Team, P, W, D, L, Pts */
-  .stt th:nth-child(7),.stt td:nth-child(7),
-  .stt th:nth-child(8),.stt td:nth-child(8),
-  .stt th:nth-child(9),.stt td:nth-child(9){display:none;}
+  .stt th:nth-child(n+6),.stt td:nth-child(n+6){display:none;}
 }
 @media(prefers-reduced-motion:reduce){
   *{animation-duration:.01ms!important;transition-duration:.01ms!important;}
@@ -481,7 +478,6 @@ function liveBdg(){return`<div class="lbdg"><div class="pdot"></div>LIVE</div>`;
 
 /* ── NAVIGATION ── */
 let CUR='home',TID=null,MF='all',AT='matches';
-let _heroAnimated=false; // guard: only run hero entrance animation once
 window._curPage='home';
 
 window.nav=function(page,extra){
@@ -607,53 +603,29 @@ function renderHome(){
     </div>
   </div>`;
 
-  // Animate hero in — only on first render
-  if(!_heroAnimated){
-    _heroAnimated=true;
-    requestAnimationFrame(()=>{
-      if(window.gsap){
-        gsap.set(['#HTI','#HCH','#HSU','#HTA','#HCA','#HSC'],{opacity:0});
-        gsap.set('#HTI',{skewY:6,y:80});
-        gsap.set(['#HCH','#HSU','#HTA'],{y:24});
-        gsap.set('#HCA',{y:32});
-        gsap.set('#HSC',{y:12});
-        const tl=gsap.timeline({defaults:{ease:'power4.out'}});
-        tl.to('#HCH',{opacity:1,y:0,duration:.85,delay:.05})
-          .to('#HTI',{opacity:1,y:0,skewY:0,duration:1.1},'-=.45')
-          .to('#HSU',{opacity:1,y:0,duration:.75},'-=.65')
-          .to('#HTA',{opacity:1,y:0,duration:.7},'-=.55')
-          .to('#HCA',{opacity:1,y:0,duration:.85},'-=.45')
-          .to('#HSC',{opacity:1,y:0,duration:.6},'-=.2');
-      }else{
-        ['HTI','HCH','HSU','HTA','HCA','HSC'].forEach(id=>{
-          const e=document.getElementById(id);if(e){e.style.opacity='1';e.style.transform='none';}
-        });
-      }
-      initTilt();
-      if(window._bindScrollCamera)window._bindScrollCamera();
-    });
-  }else{
-    // Re-render: just make sure hero elements are visible (no animation flash)
-    ['HTI','HCH','HSU','HTA','HCA','HSC'].forEach(id=>{
-      const e=document.getElementById(id);
-      if(e){e.style.opacity='1';e.style.transform='none';}
-    });
+  // Animate hero in
+  requestAnimationFrame(()=>{
+    if(window.gsap){
+      gsap.set(['#HTI','#HCH','#HSU','#HTA','#HCA','#HSC'],{opacity:0});
+      gsap.set('#HTI',{skewY:6,y:80});
+      gsap.set(['#HCH','#HSU','#HTA'],{y:24});
+      gsap.set('#HCA',{y:32});
+      gsap.set('#HSC',{y:12});
+      const tl=gsap.timeline({defaults:{ease:'power4.out'}});
+      tl.to('#HCH',{opacity:1,y:0,duration:.85,delay:.05})
+        .to('#HTI',{opacity:1,y:0,skewY:0,duration:1.1},'-=.45')
+        .to('#HSU',{opacity:1,y:0,duration:.75},'-=.65')
+        .to('#HTA',{opacity:1,y:0,duration:.7},'-=.55')
+        .to('#HCA',{opacity:1,y:0,duration:.85},'-=.45')
+        .to('#HSC',{opacity:1,y:0,duration:.6},'-=.2');
+    }else{
+      ['HTI','HCH','HSU','HTA','HCA','HSC'].forEach(id=>{
+        const e=document.getElementById(id);if(e){e.style.opacity='1';e.style.transform='none';}
+      });
+    }
     initTilt();
-  }
-  // Force-reveal sections that are already in or near viewport
-  // (don't rely solely on ScrollTrigger which misses already-visible elements)
-  setTimeout(()=>{
-    document.querySelectorAll('.reveal:not(.done)').forEach(el=>{
-      const rect=el.getBoundingClientRect();
-      if(rect.top<window.innerHeight*1.1){
-        el.classList.add('done');
-        if(window.gsap){
-          gsap.fromTo(el,{opacity:0,y:28},{opacity:1,y:0,duration:.85,ease:'power3.out'});
-        }
-      }
-    });
-    initReveal(); // pick up any below-fold ones too
-  },120);
+    if(window._bindScrollCamera)window._bindScrollCamera();
+  });
 }
 
 /* ── MATCHES ── */
@@ -995,8 +967,6 @@ function toast(msg,type='ok'){
     </div>
     <div class="h-scue" style="opacity:1"><div class="scl"></div><div class="sct">Scroll</div></div>
   </section>`;
-  // Bind scroll camera immediately so top-down → sideline sweep works on load
-  setTimeout(()=>{if(window._bindScrollCamera)window._bindScrollCamera();},200);
 })();
 </script>
 
@@ -1042,11 +1012,11 @@ camera.position.set(0,52,0);
 camera.lookAt(0,0,0);
 
 /* ── LIGHTS ── */
-// Main overhead white light — stadium feeling
-scene.add(new THREE.AmbientLight(0x0d0d18,4));
+// Reduced ambient — don't neon-blast the field
+scene.add(new THREE.AmbientLight(0x0d0d18,1.5));
 
-// Four stadium floodlights — one per corner
-const floodIntensities=[9,7,8,6];
+// Four stadium floodlights — toned down so field isn't neon green
+const floodIntensities=[4,3,3.5,2.5];
 const floodCols=[0xfff8e0,0xfff0cc,0xfff5d0,0xfffae0];
 const floodLights=[];
 [[-18,24,-12],[-18,24,12],[18,24,-12],[18,24,12]].forEach(([x,y,z],i)=>{
@@ -1058,21 +1028,21 @@ const floodLights=[];
   floodLights.push(fl);
 });
 
-// Subtle coloured underlights for drama
-const goalLightL=new THREE.PointLight(0xf7b500,2,20);goalLightL.position.set(-14,1,0);scene.add(goalLightL);
-const goalLightR=new THREE.PointLight(0xe91e63,2,20);goalLightR.position.set(14,1,0);scene.add(goalLightR);
+// Subtle coloured underlights for drama — also reduced
+const goalLightL=new THREE.PointLight(0xf7b500,1.2,16);goalLightL.position.set(-14,1,0);scene.add(goalLightL);
+const goalLightR=new THREE.PointLight(0xe91e63,1.2,16);goalLightR.position.set(14,1,0);scene.add(goalLightR);
 
 /* ── FIELD ── */
-// Main green surface
-const fieldMat=new THREE.MeshStandardMaterial({color:0x00260a,roughness:.96,metalness:0});
+// Darker, more realistic grass colour
+const fieldMat=new THREE.MeshStandardMaterial({color:0x001f08,roughness:.98,metalness:0});
 const field=new THREE.Mesh(new THREE.PlaneGeometry(28,18),fieldMat);
 field.rotation.x=-Math.PI/2;
 field.receiveShadow=!isTouch;
 scene.add(field);
 
-// Alternating grass stripes — lighter/darker bands, 7 stripes
+// Alternating grass stripes — subtle difference
 for(let i=0;i<7;i++){
-  const sm=new THREE.MeshStandardMaterial({color:i%2===0?0x00320d:0x00220a,roughness:1,transparent:true,opacity:.9});
+  const sm=new THREE.MeshStandardMaterial({color:i%2===0?0x002810:0x001a07,roughness:1,transparent:true,opacity:.9});
   const s=new THREE.Mesh(new THREE.PlaneGeometry(4,18),sm);
   s.rotation.x=-Math.PI/2;
   s.position.set(-12+i*4,0.001,0);
@@ -1118,92 +1088,116 @@ mkLine([[14,Y,-2.6],[11,Y,-2.6],[11,Y,2.6],[14,Y,2.6]],0xffffff,.45);
   for(let i=0;i<=12;i++){const a=i/12*Math.PI/2;ca.push([x+sx*Math.cos(a),Y,z+sz*Math.sin(a)]);}
   mkLine(ca,0xffffff,.4);
 });
-// Goal outlines on field (coloured)
-mkLine([[-14,Y,-2],[-14.5,Y,-2],[-14.5,Y,2],[-14,Y,2]],0xf7b500,.9);
-mkLine([[14,Y,-2],[14.5,Y,-2],[14.5,Y,2],[14,Y,2]],0xe91e63,.9);
+// Goal mouth outlines on field (coloured) — just the opening at the goal line
+mkLine([[-14,Y,-2],[- 14,Y,2]],0xf7b500,1.0);
+mkLine([[14,Y,-2],[14,Y,2]],0xe91e63,1.0);
 
 /* ── GOAL POSTS ── */
+// Goals sit ON the field: posts base at y=0, top at y=POST_H
+// Goal line is at x=±14. Goals extend OUTWARD (away from field centre).
 function buildGoal(side){
   const col=side<0?0xf7b500:0xe91e63;
-  const mat=new THREE.MeshStandardMaterial({color:col,emissive:col,emissiveIntensity:.5,roughness:.25,metalness:.9});
-  const x=side*14.3;
-  const POST_H=2.4;  // total post height
-  const GOAL_W=4.0;  // inner width between posts (z: -2 to +2)
-  // two upright posts — centered at y = POST_H/2
-  [-2,2].forEach(z=>{
-    const post=new THREE.Mesh(new THREE.CylinderGeometry(.055,.055,POST_H,10),mat);
-    post.position.set(x,POST_H/2,z);scene.add(post);
+  const mat=new THREE.MeshStandardMaterial({
+    color:col,emissive:col,emissiveIntensity:.4,roughness:.3,metalness:.85
   });
-  // crossbar — sits at TOP of posts (y = POST_H), length = GOAL_W + post_diameter*2
-  const barLen=GOAL_W+0.11; // span between outer edges of posts
-  const bar=new THREE.Mesh(new THREE.CylinderGeometry(.048,.048,barLen,10),mat);
+  const POST_H=2.0;       // goal height (realistic futsal: ~2m)
+  const HALF_W=2.0;       // half-width: posts at z=±2
+  const GX=side*14.0;     // goal sits exactly on the goal line
+  const BAR_LEN=HALF_W*2; // 4.0 — inner span
+
+  // Left and right uprights — base at y=0, so position center at y=POST_H/2
+  [-HALF_W, HALF_W].forEach(z=>{
+    const post=new THREE.Mesh(new THREE.CylinderGeometry(.055,.055,POST_H,10),mat);
+    post.position.set(GX, POST_H/2, z);
+    scene.add(post);
+  });
+
+  // Crossbar — horizontal, sits on TOP of posts at y=POST_H
+  const bar=new THREE.Mesh(new THREE.CylinderGeometry(.048,.048,BAR_LEN,10),mat);
   bar.rotation.z=Math.PI/2;
-  bar.position.set(x,POST_H,0); // top of posts
+  bar.position.set(GX, POST_H, 0);
   scene.add(bar);
-  // net (vertical + horizontal threads)
-  const nMat=new THREE.LineBasicMaterial({color:col,transparent:true,opacity:.18});
-  const depth=side*.55;
-  // vertical net strands — from floor to crossbar
+
+  // Net threads — inside the goal, going toward centre of field
+  const netDepth=side*(-0.6); // goes INWARD toward field
+  const nMat=new THREE.LineBasicMaterial({color:col,transparent:true,opacity:.2});
+  // Vertical strands
   for(let i=-4;i<=4;i++){
+    const z=i*(HALF_W/4);
     const vg=new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(x,0.02,i*.48),
-      new THREE.Vector3(x+depth,POST_H,i*.48)
+      new THREE.Vector3(GX, 0.02, z),
+      new THREE.Vector3(GX+netDepth, POST_H, z)
     ]);
     scene.add(new THREE.Line(vg,nMat));
   }
-  // horizontal net strands
-  for(let j=0;j<=5;j++){
-    const h=j*(POST_H/5);
+  // Horizontal strands
+  for(let j=0;j<=4;j++){
+    const h=j*(POST_H/4);
     const hg=new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(x,h,-2.05),
-      new THREE.Vector3(x+depth,h,2.05)
+      new THREE.Vector3(GX, h, -HALF_W),
+      new THREE.Vector3(GX+netDepth, h, HALF_W)
     ]);
     scene.add(new THREE.Line(hg,nMat));
   }
+
+  // Ground-level bottom bar (closes the net at the back)
+  const botBar=new THREE.Mesh(new THREE.CylinderGeometry(.03,.03,BAR_LEN,8),mat);
+  botBar.rotation.z=Math.PI/2;
+  botBar.position.set(GX+netDepth, 0.03, 0);
+  scene.add(botBar);
 }
 buildGoal(-1);buildGoal(1);
 
 /* ── BALL ── */
 const ballG=new THREE.Group();
-const R=0.32; // ball radius
-const ballMat=new THREE.MeshStandardMaterial({color:0xf0f0f0,roughness:.35,metalness:.04});
-const ballSphere=new THREE.Mesh(new THREE.SphereGeometry(R,32,24),ballMat);
+const R=0.28; // ball radius
+const ballMat=new THREE.MeshStandardMaterial({color:0xeeeeee,roughness:.4,metalness:.03});
+const ballSphere=new THREE.Mesh(new THREE.SphereGeometry(R,28,20),ballMat);
 ballG.add(ballSphere);
-// Black panels — flattened discs sitting ON the surface, not protruding spheres
-// Use a flattened ellipsoid (ScaleY very small) to look like painted patches
-const pMat=new THREE.MeshStandardMaterial({color:0x080808,roughness:.55,metalness:.02});
-const panelDirs=[[0,1,0],[0,-1,0],[1,0,0],[-1,0,0],[0,0,1],[0,0,-1],[.7,.7,0],[-.7,.7,0],[.7,-.7,0],[-.7,-.7,0],[0,.7,.7],[0,-.7,.7],[0,.7,-.7],[0,-.7,-.7]];
-panelDirs.forEach(([x,y,z])=>{
+
+// Black panels as flat CircleGeometry discs ON the surface
+const pMat=new THREE.MeshStandardMaterial({color:0x080808,roughness:.6,metalness:.01,side:THREE.FrontSide});
+[[0,1,0],[0,-1,0],[1,0,0],[-1,0,0],[0,0,1],[0,0,-1],
+ [.7,.7,0],[-.7,.7,0],[.7,-.7,0],[-.7,-.7,0],
+ [0,.7,.7],[0,-.7,.7],[0,.7,-.7],[0,-.7,-.7]
+].forEach(([x,y,z])=>{
   const pv=new THREE.Vector3(x,y,z).normalize();
-  // Place disc at ball surface
-  const pm=new THREE.Mesh(new THREE.CircleGeometry(.085,8),pMat);
-  // Orient disc to face outward (normal = pv)
-  pm.position.copy(pv.clone().multiplyScalar(R+0.001)); // just above surface
-  pm.lookAt(pm.position.clone().multiplyScalar(2)); // face outward
+  const pm=new THREE.Mesh(new THREE.CircleGeometry(.072,7),pMat);
+  // Position disc just above surface
+  pm.position.copy(pv.clone().multiplyScalar(R+0.002));
+  // Orient to face outward (normal = pv)
+  pm.lookAt(pm.position.clone().add(pv));
   ballG.add(pm);
 });
-// Ball point light
-const ballLight=new THREE.PointLight(0xffd060,0,8);ballG.add(ballLight);
-ballG.position.set(0,.32,0);scene.add(ballG);
 
-// Ball trail
-const TLEN=16;
+// Ball glow light — very subtle
+const ballLight=new THREE.PointLight(0xffd060,0.6,5);
+ballG.add(ballLight);
+
+// Start ball on the field surface
+ballG.position.set(0, R, 0);
+scene.add(ballG);
+
+// Ball trail — pre-fill buffer so no ring artifact at startup
+const TLEN=14;
 const trailBuf=new Float32Array(TLEN*3);
+// Init all points to ball start pos so trail is invisible at t=0
+for(let i=0;i<TLEN;i++){trailBuf[i*3]=0;trailBuf[i*3+1]=R;trailBuf[i*3+2]=0;}
 const trailGeo=new THREE.BufferGeometry();
 trailGeo.setAttribute('position',new THREE.BufferAttribute(trailBuf,3));
-const trail=new THREE.Line(trailGeo,new THREE.LineBasicMaterial({color:0xf7b500,transparent:true,opacity:.25,blending:THREE.AdditiveBlending}));
+const trail=new THREE.Line(trailGeo,new THREE.LineBasicMaterial({
+  color:0xf7b500,transparent:true,opacity:.22,blending:THREE.AdditiveBlending,depthWrite:false
+}));
 scene.add(trail);
 
-/* ── BALL PHYSICS — simple, stable ── */
-// Ball moves in a figure-8 / sinusoidal path — no bouncing off walls
-// This is smoother and more cinematic than physics bouncing
+/* ── BALL PATH — smooth Lissajous, stays on/near ground ── */
 let ballT=0;
 function ballPos(t){
-  // Lissajous path confined to field
   return{
-    x:Math.sin(t*.7)*11,
-    z:Math.sin(t*.4)*6.5,
-    y:.32+Math.abs(Math.sin(t*2.2))*.6
+    x:Math.sin(t*.65)*10.5,
+    z:Math.sin(t*.38)*6.0,
+    // Very gentle bounce — ball stays close to ground
+    y:R+Math.abs(Math.sin(t*1.8))*.18
   };
 }
 
@@ -1211,16 +1205,9 @@ function ballPos(t){
 let currentPage='home';
 window._sceneSetPage=function(page){
   currentPage=page;
+  // When leaving home, camera flies to sideline
   if(page!=='home'){
     Object.assign(camTarget,CAM.other);
-  }else{
-    // When returning to home, immediately sync camera to current scroll position
-    if(window._bindScrollCamera)window._bindScrollCamera();
-    const hero=document.getElementById('hero');
-    if(hero){
-      const progress=Math.min(1,window.scrollY/hero.offsetHeight);
-      Object.assign(camTarget,getHomeScrollCam(progress));
-    }
   }
 };
 
@@ -1252,32 +1239,25 @@ function getHomeScrollCam(progress){
   }
 }
 
-window._bindScrollCamera=(function(){
-  let _bound=false;
-  return function(){
-    if(_bound)return;
-    _bound=true;
-    window.addEventListener('scroll',onScroll,{passive:true});
-    onScroll();
-  };
-})();
-
-// Always-on scroll listener for nav + progress bar (even before camera binds)
-window.addEventListener('scroll',()=>{
-  const scrolled=window.scrollY;
-  const total=document.body.scrollHeight-innerHeight;
-  if(window.gsap)gsap.to('#SP',{scaleX:total>0?scrolled/total:0,ease:'none',duration:.08});
-  document.getElementById('tnav')?.classList.toggle('sc',scrolled>40);
-},{passive:true});
+window._bindScrollCamera=function(){
+  // Called after home page renders
+  window.addEventListener('scroll',onScroll,{passive:true});
+  onScroll(); // fire once immediately
+};
 
 function onScroll(){
-  if(currentPage!=='home')return;
+  if(currentPage!=='home'){return;}
   const hero=document.getElementById('hero');
   if(!hero)return;
   const scrolled=window.scrollY;
   const heroH=hero.offsetHeight;
   const progress=Math.min(1,scrolled/heroH);
   Object.assign(camTarget,getHomeScrollCam(progress));
+  // Scroll progress bar
+  const total=document.body.scrollHeight-innerHeight;
+  if(window.gsap)gsap.to('#SP',{scaleX:total>0?scrolled/total:0,ease:'none',duration:.08});
+  // Nav background on scroll
+  document.getElementById('tnav')?.classList.toggle('sc',scrolled>40);
 }
 
 /* ── MOUSE PARALLAX (desktop) ── */
@@ -1313,8 +1293,8 @@ function animate(){
   // Spin based on movement direction
   ballG.rotation.z+=dt*2.5;
   ballG.rotation.x+=dt*1.8;
-  // Ball glow — subtle
-  ballLight.intensity=.8+Math.sin(t*3)*.3;
+  // Ball glow — subtle, matches reduced lighting environment
+  ballLight.intensity=0.5+Math.sin(t*3)*.2;
 
   // Trail update
   for(let i=TLEN-1;i>0;i--){
@@ -1327,12 +1307,12 @@ function animate(){
   trailBuf[2]=ballG.position.z;
   trailGeo.attributes.position.needsUpdate=true;
 
-  /* Flood lights — gentle flicker */
+  /* Flood lights — gentle flicker — clamped to stay dark */
   floodLights.forEach((fl,i)=>{
-    fl.intensity=floodIntensities[i]+Math.sin(t*.3+i)*0.4;
+    fl.intensity=floodIntensities[i]+Math.sin(t*.3+i)*0.25;
   });
-  goalLightL.intensity=1.8+Math.sin(t*1.4)*.5;
-  goalLightR.intensity=1.8+Math.cos(t*1.6)*.5;
+  goalLightL.intensity=1.0+Math.sin(t*1.4)*.3;
+  goalLightR.intensity=1.0+Math.cos(t*1.6)*.3;
 
   /* Camera lerp toward target */
   // Add subtle mouse/gyro offset on top of target
@@ -1424,27 +1404,27 @@ window.initReveal=function(){
   if(window.gsap&&window.ScrollTrigger){
     gsap.registerPlugin(ScrollTrigger);
     els.forEach(el=>{
+      gsap.fromTo(el,{opacity:0,y:36},{opacity:1,y:0,duration:.85,ease:'power3.out',
+        scrollTrigger:{trigger:el,start:'top 88%',toggleActions:'play none none none'}});
       el.classList.add('done');
-      gsap.fromTo(el,{opacity:0,y:28},{opacity:1,y:0,duration:.85,ease:'power3.out',
-        scrollTrigger:{trigger:el,start:'top 105%',toggleActions:'play none none none',once:true}});
     });
     const mcs=document.querySelectorAll('.mc:not(.rv)');
     if(mcs.length){
-      mcs.forEach(c=>c.classList.add('rv'));
       gsap.fromTo(mcs,{opacity:0,x:-18},{opacity:1,x:0,duration:.5,ease:'power2.out',stagger:.07,
-        scrollTrigger:{trigger:mcs[0],start:'top 105%',once:true}});
+        scrollTrigger:{trigger:mcs[0],start:'top 90%'}});
+      mcs.forEach(c=>c.classList.add('rv'));
     }
     const gbis=document.querySelectorAll('.gbi:not(.rv)');
     if(gbis.length){
-      gbis.forEach(c=>c.classList.add('rv'));
       gsap.fromTo(gbis,{opacity:0,x:-28},{opacity:1,x:0,duration:.6,ease:'power3.out',stagger:.08,
-        scrollTrigger:{trigger:gbis[0],start:'top 105%',once:true}});
+        scrollTrigger:{trigger:gbis[0],start:'top 90%'}});
+      gbis.forEach(c=>c.classList.add('rv'));
     }
     const tcds=document.querySelectorAll('.tcard:not(.rv)');
     if(tcds.length){
-      tcds.forEach(c=>c.classList.add('rv'));
       gsap.fromTo(tcds,{opacity:0,y:28,scale:.96},{opacity:1,y:0,scale:1,duration:.6,ease:'power3.out',stagger:.07,
-        scrollTrigger:{trigger:tcds[0],start:'top 105%',once:true}});
+        scrollTrigger:{trigger:tcds[0],start:'top 90%'}});
+      tcds.forEach(c=>c.classList.add('rv'));
     }
   }else{
     els.forEach(el=>el.classList.add('done'));
