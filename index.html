@@ -287,7 +287,10 @@ button:focus-visible,[role="button"]:focus-visible{outline:2px solid var(--gold)
   .atabs{gap:6px;}.atb{padding:8px 12px;font-size:11px;}
   .h-scue{display:none;}
   .lb2{padding:36px 24px;}
-  .stt th:nth-child(n+6),.stt td:nth-child(n+6){display:none;}
+  /* Hide GF, GA, GD on mobile standings — keep #, Team, P, W, D, L, Pts */
+  .stt th:nth-child(7),.stt td:nth-child(7),
+  .stt th:nth-child(8),.stt td:nth-child(8),
+  .stt th:nth-child(9),.stt td:nth-child(9){display:none;}
 }
 @media(prefers-reduced-motion:reduce){
   *{animation-duration:.01ms!important;transition-duration:.01ms!important;}
@@ -478,6 +481,7 @@ function liveBdg(){return`<div class="lbdg"><div class="pdot"></div>LIVE</div>`;
 
 /* ── NAVIGATION ── */
 let CUR='home',TID=null,MF='all',AT='matches';
+let _heroAnimated=false; // guard: only run hero entrance animation once
 window._curPage='home';
 
 window.nav=function(page,extra){
@@ -603,29 +607,53 @@ function renderHome(){
     </div>
   </div>`;
 
-  // Animate hero in
-  requestAnimationFrame(()=>{
-    if(window.gsap){
-      gsap.set(['#HTI','#HCH','#HSU','#HTA','#HCA','#HSC'],{opacity:0});
-      gsap.set('#HTI',{skewY:6,y:80});
-      gsap.set(['#HCH','#HSU','#HTA'],{y:24});
-      gsap.set('#HCA',{y:32});
-      gsap.set('#HSC',{y:12});
-      const tl=gsap.timeline({defaults:{ease:'power4.out'}});
-      tl.to('#HCH',{opacity:1,y:0,duration:.85,delay:.05})
-        .to('#HTI',{opacity:1,y:0,skewY:0,duration:1.1},'-=.45')
-        .to('#HSU',{opacity:1,y:0,duration:.75},'-=.65')
-        .to('#HTA',{opacity:1,y:0,duration:.7},'-=.55')
-        .to('#HCA',{opacity:1,y:0,duration:.85},'-=.45')
-        .to('#HSC',{opacity:1,y:0,duration:.6},'-=.2');
-    }else{
-      ['HTI','HCH','HSU','HTA','HCA','HSC'].forEach(id=>{
-        const e=document.getElementById(id);if(e){e.style.opacity='1';e.style.transform='none';}
-      });
-    }
+  // Animate hero in — only on first render
+  if(!_heroAnimated){
+    _heroAnimated=true;
+    requestAnimationFrame(()=>{
+      if(window.gsap){
+        gsap.set(['#HTI','#HCH','#HSU','#HTA','#HCA','#HSC'],{opacity:0});
+        gsap.set('#HTI',{skewY:6,y:80});
+        gsap.set(['#HCH','#HSU','#HTA'],{y:24});
+        gsap.set('#HCA',{y:32});
+        gsap.set('#HSC',{y:12});
+        const tl=gsap.timeline({defaults:{ease:'power4.out'}});
+        tl.to('#HCH',{opacity:1,y:0,duration:.85,delay:.05})
+          .to('#HTI',{opacity:1,y:0,skewY:0,duration:1.1},'-=.45')
+          .to('#HSU',{opacity:1,y:0,duration:.75},'-=.65')
+          .to('#HTA',{opacity:1,y:0,duration:.7},'-=.55')
+          .to('#HCA',{opacity:1,y:0,duration:.85},'-=.45')
+          .to('#HSC',{opacity:1,y:0,duration:.6},'-=.2');
+      }else{
+        ['HTI','HCH','HSU','HTA','HCA','HSC'].forEach(id=>{
+          const e=document.getElementById(id);if(e){e.style.opacity='1';e.style.transform='none';}
+        });
+      }
+      initTilt();
+      if(window._bindScrollCamera)window._bindScrollCamera();
+    });
+  }else{
+    // Re-render: just make sure hero elements are visible (no animation flash)
+    ['HTI','HCH','HSU','HTA','HCA','HSC'].forEach(id=>{
+      const e=document.getElementById(id);
+      if(e){e.style.opacity='1';e.style.transform='none';}
+    });
     initTilt();
-    if(window._bindScrollCamera)window._bindScrollCamera();
-  });
+  }
+  // Force-reveal sections that are already in or near viewport
+  // (don't rely solely on ScrollTrigger which misses already-visible elements)
+  setTimeout(()=>{
+    document.querySelectorAll('.reveal:not(.done)').forEach(el=>{
+      const rect=el.getBoundingClientRect();
+      if(rect.top<window.innerHeight*1.1){
+        el.classList.add('done');
+        if(window.gsap){
+          gsap.fromTo(el,{opacity:0,y:28},{opacity:1,y:0,duration:.85,ease:'power3.out'});
+        }
+      }
+    });
+    initReveal(); // pick up any below-fold ones too
+  },120);
 }
 
 /* ── MATCHES ── */
@@ -967,6 +995,8 @@ function toast(msg,type='ok'){
     </div>
     <div class="h-scue" style="opacity:1"><div class="scl"></div><div class="sct">Scroll</div></div>
   </section>`;
+  // Bind scroll camera immediately so top-down → sideline sweep works on load
+  setTimeout(()=>{if(window._bindScrollCamera)window._bindScrollCamera();},200);
 })();
 </script>
 
@@ -1097,24 +1127,37 @@ function buildGoal(side){
   const col=side<0?0xf7b500:0xe91e63;
   const mat=new THREE.MeshStandardMaterial({color:col,emissive:col,emissiveIntensity:.5,roughness:.25,metalness:.9});
   const x=side*14.3;
-  // two upright posts
+  const POST_H=2.4;  // total post height
+  const GOAL_W=4.0;  // inner width between posts (z: -2 to +2)
+  // two upright posts — centered at y = POST_H/2
   [-2,2].forEach(z=>{
-    const post=new THREE.Mesh(new THREE.CylinderGeometry(.055,.055,2.4,10),mat);
-    post.position.set(x,1.2,z);scene.add(post);
+    const post=new THREE.Mesh(new THREE.CylinderGeometry(.055,.055,POST_H,10),mat);
+    post.position.set(x,POST_H/2,z);scene.add(post);
   });
-  // crossbar
-  const bar=new THREE.Mesh(new THREE.CylinderGeometry(.048,.048,4.1,10),mat);
-  bar.rotation.z=Math.PI/2;bar.position.set(x,2.4,0);scene.add(bar);
+  // crossbar — sits at TOP of posts (y = POST_H), length = GOAL_W + post_diameter*2
+  const barLen=GOAL_W+0.11; // span between outer edges of posts
+  const bar=new THREE.Mesh(new THREE.CylinderGeometry(.048,.048,barLen,10),mat);
+  bar.rotation.z=Math.PI/2;
+  bar.position.set(x,POST_H,0); // top of posts
+  scene.add(bar);
   // net (vertical + horizontal threads)
   const nMat=new THREE.LineBasicMaterial({color:col,transparent:true,opacity:.18});
   const depth=side*.55;
+  // vertical net strands — from floor to crossbar
   for(let i=-4;i<=4;i++){
-    const vg=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(x,0.05,i*.48),new THREE.Vector3(x+depth,2.4,i*.48)]);
+    const vg=new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(x,0.02,i*.48),
+      new THREE.Vector3(x+depth,POST_H,i*.48)
+    ]);
     scene.add(new THREE.Line(vg,nMat));
   }
+  // horizontal net strands
   for(let j=0;j<=5;j++){
-    const h=j*.48;
-    const hg=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(x,h,-2),new THREE.Vector3(x+depth,h,2)]);
+    const h=j*(POST_H/5);
+    const hg=new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(x,h,-2.05),
+      new THREE.Vector3(x+depth,h,2.05)
+    ]);
     scene.add(new THREE.Line(hg,nMat));
   }
 }
@@ -1122,14 +1165,21 @@ buildGoal(-1);buildGoal(1);
 
 /* ── BALL ── */
 const ballG=new THREE.Group();
-const ballMat=new THREE.MeshStandardMaterial({color:0xf0f0f0,roughness:.3,metalness:.05});
-ballG.add(new THREE.Mesh(new THREE.SphereGeometry(.32,28,20),ballMat));
-// Black panels
-const pMat=new THREE.MeshStandardMaterial({color:0x0a0a0a,roughness:.5});
-[[0,1,0],[0,-1,0],[1,0,0],[-1,0,0],[0,0,1],[0,0,-1],[.7,.7,0],[-.7,.7,0],[.7,-.7,0],[-.7,-.7,0]].forEach(([x,y,z])=>{
+const R=0.32; // ball radius
+const ballMat=new THREE.MeshStandardMaterial({color:0xf0f0f0,roughness:.35,metalness:.04});
+const ballSphere=new THREE.Mesh(new THREE.SphereGeometry(R,32,24),ballMat);
+ballG.add(ballSphere);
+// Black panels — flattened discs sitting ON the surface, not protruding spheres
+// Use a flattened ellipsoid (ScaleY very small) to look like painted patches
+const pMat=new THREE.MeshStandardMaterial({color:0x080808,roughness:.55,metalness:.02});
+const panelDirs=[[0,1,0],[0,-1,0],[1,0,0],[-1,0,0],[0,0,1],[0,0,-1],[.7,.7,0],[-.7,.7,0],[.7,-.7,0],[-.7,-.7,0],[0,.7,.7],[0,-.7,.7],[0,.7,-.7],[0,-.7,-.7]];
+panelDirs.forEach(([x,y,z])=>{
   const pv=new THREE.Vector3(x,y,z).normalize();
-  const pm=new THREE.Mesh(new THREE.SphereGeometry(.11,7,7),pMat);
-  pm.position.copy(pv.multiplyScalar(.3));
+  // Place disc at ball surface
+  const pm=new THREE.Mesh(new THREE.CircleGeometry(.085,8),pMat);
+  // Orient disc to face outward (normal = pv)
+  pm.position.copy(pv.clone().multiplyScalar(R+0.001)); // just above surface
+  pm.lookAt(pm.position.clone().multiplyScalar(2)); // face outward
   ballG.add(pm);
 });
 // Ball point light
@@ -1161,9 +1211,16 @@ function ballPos(t){
 let currentPage='home';
 window._sceneSetPage=function(page){
   currentPage=page;
-  // When leaving home, camera flies to sideline
   if(page!=='home'){
     Object.assign(camTarget,CAM.other);
+  }else{
+    // When returning to home, immediately sync camera to current scroll position
+    if(window._bindScrollCamera)window._bindScrollCamera();
+    const hero=document.getElementById('hero');
+    if(hero){
+      const progress=Math.min(1,window.scrollY/hero.offsetHeight);
+      Object.assign(camTarget,getHomeScrollCam(progress));
+    }
   }
 };
 
@@ -1195,25 +1252,32 @@ function getHomeScrollCam(progress){
   }
 }
 
-window._bindScrollCamera=function(){
-  // Called after home page renders
-  window.addEventListener('scroll',onScroll,{passive:true});
-  onScroll(); // fire once immediately
-};
+window._bindScrollCamera=(function(){
+  let _bound=false;
+  return function(){
+    if(_bound)return;
+    _bound=true;
+    window.addEventListener('scroll',onScroll,{passive:true});
+    onScroll();
+  };
+})();
+
+// Always-on scroll listener for nav + progress bar (even before camera binds)
+window.addEventListener('scroll',()=>{
+  const scrolled=window.scrollY;
+  const total=document.body.scrollHeight-innerHeight;
+  if(window.gsap)gsap.to('#SP',{scaleX:total>0?scrolled/total:0,ease:'none',duration:.08});
+  document.getElementById('tnav')?.classList.toggle('sc',scrolled>40);
+},{passive:true});
 
 function onScroll(){
-  if(currentPage!=='home'){return;}
+  if(currentPage!=='home')return;
   const hero=document.getElementById('hero');
   if(!hero)return;
   const scrolled=window.scrollY;
   const heroH=hero.offsetHeight;
   const progress=Math.min(1,scrolled/heroH);
   Object.assign(camTarget,getHomeScrollCam(progress));
-  // Scroll progress bar
-  const total=document.body.scrollHeight-innerHeight;
-  if(window.gsap)gsap.to('#SP',{scaleX:total>0?scrolled/total:0,ease:'none',duration:.08});
-  // Nav background on scroll
-  document.getElementById('tnav')?.classList.toggle('sc',scrolled>40);
 }
 
 /* ── MOUSE PARALLAX (desktop) ── */
@@ -1360,27 +1424,27 @@ window.initReveal=function(){
   if(window.gsap&&window.ScrollTrigger){
     gsap.registerPlugin(ScrollTrigger);
     els.forEach(el=>{
-      gsap.fromTo(el,{opacity:0,y:36},{opacity:1,y:0,duration:.85,ease:'power3.out',
-        scrollTrigger:{trigger:el,start:'top 88%',toggleActions:'play none none none'}});
       el.classList.add('done');
+      gsap.fromTo(el,{opacity:0,y:28},{opacity:1,y:0,duration:.85,ease:'power3.out',
+        scrollTrigger:{trigger:el,start:'top 105%',toggleActions:'play none none none',once:true}});
     });
     const mcs=document.querySelectorAll('.mc:not(.rv)');
     if(mcs.length){
-      gsap.fromTo(mcs,{opacity:0,x:-18},{opacity:1,x:0,duration:.5,ease:'power2.out',stagger:.07,
-        scrollTrigger:{trigger:mcs[0],start:'top 90%'}});
       mcs.forEach(c=>c.classList.add('rv'));
+      gsap.fromTo(mcs,{opacity:0,x:-18},{opacity:1,x:0,duration:.5,ease:'power2.out',stagger:.07,
+        scrollTrigger:{trigger:mcs[0],start:'top 105%',once:true}});
     }
     const gbis=document.querySelectorAll('.gbi:not(.rv)');
     if(gbis.length){
-      gsap.fromTo(gbis,{opacity:0,x:-28},{opacity:1,x:0,duration:.6,ease:'power3.out',stagger:.08,
-        scrollTrigger:{trigger:gbis[0],start:'top 90%'}});
       gbis.forEach(c=>c.classList.add('rv'));
+      gsap.fromTo(gbis,{opacity:0,x:-28},{opacity:1,x:0,duration:.6,ease:'power3.out',stagger:.08,
+        scrollTrigger:{trigger:gbis[0],start:'top 105%',once:true}});
     }
     const tcds=document.querySelectorAll('.tcard:not(.rv)');
     if(tcds.length){
-      gsap.fromTo(tcds,{opacity:0,y:28,scale:.96},{opacity:1,y:0,scale:1,duration:.6,ease:'power3.out',stagger:.07,
-        scrollTrigger:{trigger:tcds[0],start:'top 90%'}});
       tcds.forEach(c=>c.classList.add('rv'));
+      gsap.fromTo(tcds,{opacity:0,y:28,scale:.96},{opacity:1,y:0,scale:1,duration:.6,ease:'power3.out',stagger:.07,
+        scrollTrigger:{trigger:tcds[0],start:'top 105%',once:true}});
     }
   }else{
     els.forEach(el=>el.classList.add('done'));
