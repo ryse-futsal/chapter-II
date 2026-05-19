@@ -586,14 +586,14 @@ function renderHome(){
     <div class="h-scue" id="HSC"><div class="scl"></div><div class="sct">Scroll</div></div>
   </section>
   <div class="gline"></div>
-  <div class="sec reveal">
+  <div class="sec home-sec" id="HS1" style="opacity:0;transform:translateY(24px);transition:opacity .7s ease,transform .7s ease">
     <div class="sec-ey">Latest</div>
     <div class="sec-ti">Recent Results</div>
     ${ms.filter(m=>m.status==='completed').slice(-3).reverse().map(mcHTML).join('')||'<div class="empty"><div class="empty-i">⚽</div><div class="empty-t">No matches completed yet</div></div>'}
     <div style="margin-top:24px"><button class="btn bg" onclick="nav('matches')">View Full Schedule</button></div>
   </div>
   <div class="gline"></div>
-  <div class="sec reveal">
+  <div class="sec home-sec" id="HS2" style="opacity:0;transform:translateY(24px);transition:opacity .7s ease .15s,transform .7s ease .15s">
     <div class="sec-ey">Group Stage</div>
     <div class="sec-ti">Standings</div>
     ${stHTML(standings().slice(0,5))}
@@ -1012,11 +1012,10 @@ camera.position.set(0,52,0);
 camera.lookAt(0,0,0);
 
 /* ── LIGHTS ── */
-// Reduced ambient — don't neon-blast the field
-scene.add(new THREE.AmbientLight(0x0d0d18,1.5));
+scene.add(new THREE.AmbientLight(0x0d0d18,1.8));
 
-// Four stadium floodlights — toned down so field isn't neon green
-const floodIntensities=[4,3,3.5,2.5];
+// Stadium floodlights — reduced so the field stays dark green, not neon
+const floodIntensities=[4.5,3.5,4,3];
 const floodCols=[0xfff8e0,0xfff0cc,0xfff5d0,0xfffae0];
 const floodLights=[];
 [[-18,24,-12],[-18,24,12],[18,24,-12],[18,24,12]].forEach(([x,y,z],i)=>{
@@ -1028,21 +1027,24 @@ const floodLights=[];
   floodLights.push(fl);
 });
 
-// Subtle coloured underlights for drama — also reduced
-const goalLightL=new THREE.PointLight(0xf7b500,1.2,16);goalLightL.position.set(-14,1,0);scene.add(goalLightL);
-const goalLightR=new THREE.PointLight(0xe91e63,1.2,16);goalLightR.position.set(14,1,0);scene.add(goalLightR);
+// Coloured underlights — subtle
+const goalLightL=new THREE.PointLight(0xf7b500,1.2,16);
+goalLightL.position.set(-14,1,0);scene.add(goalLightL);
+const goalLightR=new THREE.PointLight(0xe91e63,1.2,16);
+goalLightR.position.set(14,1,0);scene.add(goalLightR);
 
 /* ── FIELD ── */
-// Darker, more realistic grass colour
-const fieldMat=new THREE.MeshStandardMaterial({color:0x001f08,roughness:.98,metalness:0});
+const fieldMat=new THREE.MeshStandardMaterial({color:0x001e08,roughness:.97,metalness:0});
 const field=new THREE.Mesh(new THREE.PlaneGeometry(28,18),fieldMat);
 field.rotation.x=-Math.PI/2;
 field.receiveShadow=!isTouch;
 scene.add(field);
 
-// Alternating grass stripes — subtle difference
+// Alternating stripes
 for(let i=0;i<7;i++){
-  const sm=new THREE.MeshStandardMaterial({color:i%2===0?0x002810:0x001a07,roughness:1,transparent:true,opacity:.9});
+  const sm=new THREE.MeshStandardMaterial({
+    color:i%2===0?0x002710:0x001806,roughness:1,transparent:true,opacity:.9
+  });
   const s=new THREE.Mesh(new THREE.PlaneGeometry(4,18),sm);
   s.rotation.x=-Math.PI/2;
   s.position.set(-12+i*4,0.001,0);
@@ -1088,116 +1090,116 @@ mkLine([[14,Y,-2.6],[11,Y,-2.6],[11,Y,2.6],[14,Y,2.6]],0xffffff,.45);
   for(let i=0;i<=12;i++){const a=i/12*Math.PI/2;ca.push([x+sx*Math.cos(a),Y,z+sz*Math.sin(a)]);}
   mkLine(ca,0xffffff,.4);
 });
-// Goal mouth outlines on field (coloured) — just the opening at the goal line
-mkLine([[-14,Y,-2],[- 14,Y,2]],0xf7b500,1.0);
-mkLine([[14,Y,-2],[14,Y,2]],0xe91e63,1.0);
+// Goal outlines on field (coloured)
+mkLine([[-14,Y,-2],[-14.5,Y,-2],[-14.5,Y,2],[-14,Y,2]],0xf7b500,.9);
+mkLine([[14,Y,-2],[14.5,Y,-2],[14.5,Y,2],[14,Y,2]],0xe91e63,.9);
 
 /* ── GOAL POSTS ── */
-// Goals sit ON the field: posts base at y=0, top at y=POST_H
-// Goal line is at x=±14. Goals extend OUTWARD (away from field centre).
+// Field boundary: x=±14, z=±9
+// Goals sit ON the goal line at x=±14, opening toward field centre
+// Posts at z=±2, height=2.0, crossbar at y=2.0
 function buildGoal(side){
   const col=side<0?0xf7b500:0xe91e63;
   const mat=new THREE.MeshStandardMaterial({
-    color:col,emissive:col,emissiveIntensity:.4,roughness:.3,metalness:.85
+    color:col,emissive:col,emissiveIntensity:.45,roughness:.3,metalness:.85
   });
-  const POST_H=2.0;       // goal height (realistic futsal: ~2m)
-  const HALF_W=2.0;       // half-width: posts at z=±2
-  const GX=side*14.0;     // goal sits exactly on the goal line
-  const BAR_LEN=HALF_W*2; // 4.0 — inner span
+  const POST_H=2.0;   // 2 metres tall
+  const GW=2.0;       // half-width: posts at z=−2 and z=+2
+  const GX=side*14.0; // exactly on the goal line
 
-  // Left and right uprights — base at y=0, so position center at y=POST_H/2
-  [-HALF_W, HALF_W].forEach(z=>{
-    const post=new THREE.Mesh(new THREE.CylinderGeometry(.055,.055,POST_H,10),mat);
-    post.position.set(GX, POST_H/2, z);
+  // Two upright posts — CylinderGeometry default axis is Y
+  // Center at y=POST_H/2 so base sits at y=0 (ground)
+  [-GW, GW].forEach(gz=>{
+    const post=new THREE.Mesh(
+      new THREE.CylinderGeometry(.055,.055,POST_H,12),mat);
+    post.position.set(GX, POST_H/2, gz);
     scene.add(post);
   });
 
-  // Crossbar — horizontal, sits on TOP of posts at y=POST_H
-  const bar=new THREE.Mesh(new THREE.CylinderGeometry(.048,.048,BAR_LEN,10),mat);
-  bar.rotation.z=Math.PI/2;
-  bar.position.set(GX, POST_H, 0);
+  // Crossbar — lies along Z axis (goal width direction)
+  // Default cylinder axis is Y; rotate around X by 90° to make it lie along Z
+  const bar=new THREE.Mesh(
+    new THREE.CylinderGeometry(.048,.048,GW*2,12),mat);
+  bar.rotation.x=Math.PI/2;          // ← key fix: X rotation not Z
+  bar.position.set(GX, POST_H, 0);   // sits on top of posts
   scene.add(bar);
 
-  // Net threads — inside the goal, going toward centre of field
-  const netDepth=side*(-0.6); // goes INWARD toward field
-  const nMat=new THREE.LineBasicMaterial({color:col,transparent:true,opacity:.2});
-  // Vertical strands
-  for(let i=-4;i<=4;i++){
-    const z=i*(HALF_W/4);
+  // Net threads — go from goal line inward toward field centre
+  const nMat=new THREE.LineBasicMaterial({
+    color:col,transparent:true,opacity:.2,depthWrite:false
+  });
+  const netBack=GX+(side<0?0.7:-0.7); // inward depth
+
+  // Vertical strands (z-direction, front to back at each height step)
+  for(let iz=-GW;iz<=GW;iz+=GW/2){
     const vg=new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(GX, 0.02, z),
-      new THREE.Vector3(GX+netDepth, POST_H, z)
+      new THREE.Vector3(GX,    0.02, iz),
+      new THREE.Vector3(netBack, POST_H, iz)
     ]);
     scene.add(new THREE.Line(vg,nMat));
   }
-  // Horizontal strands
+  // Horizontal strands (at various heights)
   for(let j=0;j<=4;j++){
-    const h=j*(POST_H/4);
+    const hy=j*(POST_H/4);
     const hg=new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(GX, h, -HALF_W),
-      new THREE.Vector3(GX+netDepth, h, HALF_W)
+      new THREE.Vector3(GX,    hy, -GW),
+      new THREE.Vector3(netBack, hy,  GW)
     ]);
     scene.add(new THREE.Line(hg,nMat));
   }
-
-  // Ground-level bottom bar (closes the net at the back)
-  const botBar=new THREE.Mesh(new THREE.CylinderGeometry(.03,.03,BAR_LEN,8),mat);
-  botBar.rotation.z=Math.PI/2;
-  botBar.position.set(GX+netDepth, 0.03, 0);
-  scene.add(botBar);
 }
 buildGoal(-1);buildGoal(1);
 
 /* ── BALL ── */
 const ballG=new THREE.Group();
-const R=0.28; // ball radius
-const ballMat=new THREE.MeshStandardMaterial({color:0xeeeeee,roughness:.4,metalness:.03});
-const ballSphere=new THREE.Mesh(new THREE.SphereGeometry(R,28,20),ballMat);
-ballG.add(ballSphere);
+const BR=0.28; // ball radius
+const ballMat=new THREE.MeshStandardMaterial({color:0xeeeeee,roughness:.38,metalness:.04});
+ballG.add(new THREE.Mesh(new THREE.SphereGeometry(BR,28,20),ballMat));
 
-// Black panels as flat CircleGeometry discs ON the surface
-const pMat=new THREE.MeshStandardMaterial({color:0x080808,roughness:.6,metalness:.01,side:THREE.FrontSide});
-[[0,1,0],[0,-1,0],[1,0,0],[-1,0,0],[0,0,1],[0,0,-1],
- [.7,.7,0],[-.7,.7,0],[.7,-.7,0],[-.7,-.7,0],
- [0,.7,.7],[0,-.7,.7],[0,.7,-.7],[0,-.7,-.7]
+// Black panels — flat CircleGeometry discs sitting ON the ball surface
+// CircleGeometry lies in the XY plane by default; we position + orient each one
+const pMat=new THREE.MeshStandardMaterial({
+  color:0x0a0a0a,roughness:.5,metalness:.01,side:THREE.DoubleSide
+});
+[
+  [0,1,0],[0,-1,0],[1,0,0],[-1,0,0],[0,0,1],[0,0,-1],
+  [1,1,0],[-1,1,0],[1,-1,0],[-1,-1,0],
+  [0,1,1],[0,1,-1],[0,-1,1],[0,-1,-1]
 ].forEach(([x,y,z])=>{
-  const pv=new THREE.Vector3(x,y,z).normalize();
-  const pm=new THREE.Mesh(new THREE.CircleGeometry(.072,7),pMat);
-  // Position disc just above surface
-  pm.position.copy(pv.clone().multiplyScalar(R+0.002));
-  // Orient to face outward (normal = pv)
-  pm.lookAt(pm.position.clone().add(pv));
-  ballG.add(pm);
+  const dir=new THREE.Vector3(x,y,z).normalize();
+  const disc=new THREE.Mesh(new THREE.CircleGeometry(.068,6),pMat);
+  // Place just above surface
+  disc.position.copy(dir.clone().multiplyScalar(BR+0.003));
+  // Face outward: lookAt a point further along the same direction
+  disc.lookAt(dir.clone().multiplyScalar(BR+1));
+  ballG.add(disc);
 });
 
-// Ball glow light — very subtle
-const ballLight=new THREE.PointLight(0xffd060,0.6,5);
+const ballLight=new THREE.PointLight(0xffd060,0.5,5);
 ballG.add(ballLight);
-
-// Start ball on the field surface
-ballG.position.set(0, R, 0);
+ballG.position.set(0,BR,0);
 scene.add(ballG);
 
-// Ball trail — pre-fill buffer so no ring artifact at startup
+/* ── BALL TRAIL — pre-filled so no ring at startup ── */
 const TLEN=14;
 const trailBuf=new Float32Array(TLEN*3);
-// Init all points to ball start pos so trail is invisible at t=0
-for(let i=0;i<TLEN;i++){trailBuf[i*3]=0;trailBuf[i*3+1]=R;trailBuf[i*3+2]=0;}
+// Pre-fill every trail point at ball's start position
+for(let i=0;i<TLEN;i++){trailBuf[i*3+0]=0;trailBuf[i*3+1]=BR;trailBuf[i*3+2]=0;}
 const trailGeo=new THREE.BufferGeometry();
 trailGeo.setAttribute('position',new THREE.BufferAttribute(trailBuf,3));
 const trail=new THREE.Line(trailGeo,new THREE.LineBasicMaterial({
-  color:0xf7b500,transparent:true,opacity:.22,blending:THREE.AdditiveBlending,depthWrite:false
+  color:0xf7b500,transparent:true,opacity:.28,
+  blending:THREE.AdditiveBlending,depthWrite:false
 }));
 scene.add(trail);
 
-/* ── BALL PATH — smooth Lissajous, stays on/near ground ── */
+/* ── BALL PATH — smooth Lissajous, stays near ground ── */
 let ballT=0;
 function ballPos(t){
   return{
     x:Math.sin(t*.65)*10.5,
     z:Math.sin(t*.38)*6.0,
-    // Very gentle bounce — ball stays close to ground
-    y:R+Math.abs(Math.sin(t*1.8))*.18
+    y:BR+Math.abs(Math.sin(t*1.8))*.16  // barely leaves the ground
   };
 }
 
@@ -1293,12 +1295,12 @@ function animate(){
   // Spin based on movement direction
   ballG.rotation.z+=dt*2.5;
   ballG.rotation.x+=dt*1.8;
-  // Ball glow — subtle, matches reduced lighting environment
-  ballLight.intensity=0.5+Math.sin(t*3)*.2;
+  // Ball glow — subtle
+  ballLight.intensity=0.4+Math.sin(t*3)*.18;
 
-  // Trail update
+  // Trail update — shift history then write current position at [0]
   for(let i=TLEN-1;i>0;i--){
-    trailBuf[i*3]=trailBuf[(i-1)*3];
+    trailBuf[i*3  ]=trailBuf[(i-1)*3  ];
     trailBuf[i*3+1]=trailBuf[(i-1)*3+1];
     trailBuf[i*3+2]=trailBuf[(i-1)*3+2];
   }
@@ -1307,9 +1309,9 @@ function animate(){
   trailBuf[2]=ballG.position.z;
   trailGeo.attributes.position.needsUpdate=true;
 
-  /* Flood lights — gentle flicker — clamped to stay dark */
+  /* Flood lights — gentle flicker, clamped low */
   floodLights.forEach((fl,i)=>{
-    fl.intensity=floodIntensities[i]+Math.sin(t*.3+i)*0.25;
+    fl.intensity=floodIntensities[i]+Math.sin(t*.3+i)*0.3;
   });
   goalLightL.intensity=1.0+Math.sin(t*1.4)*.3;
   goalLightR.intensity=1.0+Math.cos(t*1.6)*.3;
